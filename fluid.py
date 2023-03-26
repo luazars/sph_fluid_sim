@@ -1,11 +1,17 @@
 import numpy as np
 import pygame
 from math import pi
+import random
 
 N = 1000
 m = 1
+size = 1000
 
-pos = np.random.randn(N,3)*100
+pos = np.zeros((N, 2))
+for i in range(N):
+    pos[i][0] = random.random()*size;
+    pos[i][1] = random.random()*size;
+
 p = np.zeros(N)
 
 def W(r, h):
@@ -17,19 +23,17 @@ def P():
         for j in range(N):
             if(i!=j):
                 r = np.linalg.norm(pos[i]-pos[j])
-                p[i] += m*W(r,.01)
+                p[i] += m*W(r,.07)
     
 
 pygame.init()
 
-size = 1000
+
 screen = pygame.display.set_mode([size,size])
 
 done = False
 clock = pygame.time.Clock()
 
-p = np.zeros(N)
-pos = np.random.randn(N,3)*100
 P()
 
 while not done:
@@ -41,7 +45,7 @@ while not done:
     screen.fill("white")
 
     for i in range(N):
-        pygame.draw.circle(screen, [ (p[i]/max(p))*255,0,0 ], [pos[i][0]+500, pos[i][1]+500], 5)
+        pygame.draw.circle(screen, [ (p[i]/max(p))*255,0,0 ], [pos[i][0], pos[i][1]], 5)
 
     pygame.display.flip()
 
