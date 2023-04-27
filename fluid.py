@@ -54,7 +54,7 @@ def showWindow():
         #background color
         screen.fill("white")
 
-        #drawing each particle
+        #drawing each particle with color according to the density
         for i in range(N):
             pygame.draw.circle(screen, [ (d[i]/max(d))*255,0,0 ], [pos[i][0], pos[i][1]], 5)
 
