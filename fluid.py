@@ -1,17 +1,17 @@
 import numpy as np
-import pygame
-from math import pi
+import matplotlib.pyplot as plt
+import math
 import random
 
 # width and height of the screen
 size = 1  # m
 
 # size of particle cube
-nParticlesX = 40  # number of particles in x direction
-nParticlesY = 40  # number of particles in y direction
+nParticlesX = 20  # number of particles in x direction
+nParticlesY = 20  # number of particles in y direction
 
 # distance between Particles at start
-distance = 0.05  # m
+distance = 0.01  # m
 
 # number of particles
 N = nParticlesX * nParticlesY
@@ -51,6 +51,7 @@ def setPositionInGrid():
     for i in range(N):
         x = i % nParticlesX
         y = int(i / N * nParticlesY)
+
         pos[i][0] = x * distance + xPos
         pos[i][1] = y * distance + yPos
 
@@ -58,7 +59,7 @@ def setPositionInGrid():
 # kernel function / W function
 def W(r):
     # kernel radius, include all surrounding particles of one particle in a grid
-    h = 2 ** (1 / 2) * distance  # m
+    h = np.sqrt(2) * distance  # m
 
     return (1 / ((h**3) * (np.pi ** (2 / 3)))) * np.exp((-(np.abs(r) ** 2) / h**2))
 
@@ -71,7 +72,7 @@ def calculateDensity():
             density[i] += mass * W(r)
 
 
-# calculate pressure with density of all particles with tait equation / Zustandsgleichung
+# calculate pressure with density of all particles with tait equation
 def calculatePressure():
     for i in range(N):
         pressure[i] = (
@@ -79,44 +80,27 @@ def calculatePressure():
         )  # Pa
 
 
-# matplotlib / pyplot /scatterplot
 def showWindow():
-    # initialization of pygame
-    pygame.init()
-    screen = pygame.display.set_mode([size * 1000, size * 1000])
-    done = False
-    clock = pygame.time.Clock()
+    fig, ax = plt.subplots()
 
-    # drawing loop
-    while not done:
-        clock.tick(1)
+    x = pos[:, 0]
+    y = pos[:, 1]
 
-        # checking if closing button is pressed
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                done = True
+    ax.scatter(
+        x,
+        y,
+        s=40,
+        c=density,
+        picker=True,
+    )
 
-        # background color
-        screen.fill("white")
+    fig.canvas.mpl_connect("pick_event", onPick)
+    plt.show()
 
-        # drawing each particle with color according to the density and radius according to pressure
-        for i in range(N):
-            pygame.draw.circle(
-                screen,
-                [
-                    (density[i] - min(density)) / (max(density) - min(density)) * 255,
-                    0,
-                    0,
-                ],
-                [pos[i][0] * 1000, pos[i][1] * 1000],
-                ((pressure[i] - min(pressure)) / (max(pressure) - min(pressure))) * 10
-                + 1,
-            )
 
-        # update screen
-        pygame.display.flip()
-
-    pygame.quit()
+def onPick(event):
+    ind = event.ind
+    print("index:", ind, "pressure:", pressure[ind], "density:", density[ind])
 
 
 def main():
