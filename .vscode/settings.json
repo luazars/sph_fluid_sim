@@ -1,6 +1,7 @@
 {
-    "cSpell.words": [
-        "linalg",
-        "tait"
-    ]
+  "cSpell.words": ["linalg", "tait"],
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "python.formatting.provider": "none"
 }
