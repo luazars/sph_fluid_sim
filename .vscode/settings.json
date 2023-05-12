@@ -1,6 +1,11 @@
 {
-    "cSpell.words": [
-        "linalg",
-        "tait"
-    ]
+  "cSpell.words": [
+    "linalg",
+    "matplotlib",
+    "tait"
+  ],
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "python.formatting.provider": "none"
 }
