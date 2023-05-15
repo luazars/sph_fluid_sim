@@ -1,24 +1,23 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import math
 import random
-
-# width and height of the screen
-size = 1  # m
 
 # size of particle cube
 nParticlesX = 20  # number of particles in x direction
 nParticlesY = 20  # number of particles in y direction
 
 # distance between Particles at start
-distance = 0.01  # m
+distance = 0.4  # m
+
+# kernel radiuss
+h = np.sqrt(2) * distance  # m
 
 # number of particles
 N = nParticlesX * nParticlesY
 
 
 # speed of sound
-c = 15  # m/s
+c = 5  # m/s
 # Adiabatenexponent
 m = 7
 
@@ -38,14 +37,14 @@ pos = np.zeros((N, 2))  # m
 # setting positions of particles to a random position on the screen
 def setRandomPosition():
     for i in range(N):
-        pos[i][0] = random.random() * size
-        pos[i][1] = random.random() * size
+        pos[i][0] = random.random()
+        pos[i][1] = random.random()
 
 
 # set position of particles in a cube
 def setPositionInGrid():
     # top-left position of particle cube
-    xPos = 1 / 2 * (size - nParticlesX * distance)  # center the cube on x-axis
+    xPos = 1 / 2 * (nParticlesX * distance)  # center the cube on x-axis
     yPos = 0.1
 
     for i in range(N):
@@ -59,9 +58,7 @@ def setPositionInGrid():
 # kernel function / W function
 def W(r):
     # kernel radius, include all surrounding particles of one particle in a grid
-    h = np.sqrt(2) * distance  # m
-
-    return (1 / ((h**3) * (np.pi ** (2 / 3)))) * np.exp((-(np.abs(r) ** 2) / h**2))
+    return (1 / ((h**3) * (np.pi ** (3 / 2)))) * np.exp((-(np.abs(r) ** 2) / h**2))
 
 
 # calculate density of all particles
