@@ -60,6 +60,7 @@ def setPositionInGrid():
 
 
 # kernel function / W function
+# https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
 def W(r):
     # kernel radius, include all surrounding particles of one particle in a grid
     return (1.0 / (h * np.sqrt(np.pi))) ** 3 * np.exp(-(r**2) / h**2)
@@ -74,6 +75,7 @@ def gradW(x, y, r):
 
 
 # calculate density of all particles
+# https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
 def calculateDensity():
     for i in range(N):
         for j in range(N):
@@ -82,21 +84,26 @@ def calculateDensity():
 
 
 # calculate pressure with density of all particles with tait equation
+# https://de.wikipedia.org/wiki/Taitsche_Gleichung
 def calculatePressure():
+    B = (densityReference * c**2) / m
     for i in range(N):
-        pressure[i] = (
-            (densityReference * c**2) / m * ((density[i] / densityReference) ** m - 1)
-        )  # Pa
+        pressure[i] = B * ((density[i] / densityReference) ** m)  # Pa
 
 
 # calculate acceleration of all particles
+# https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
+
+
 def calculateAcceleration():
+    global acc
     calculateDensity()
     calculatePressure()
 
-    for i in range(N):
-        acc[i] = np.zeros(2)  # initialize acceleration for particle i
+    # reset acceleration for particles
+    acc = np.zeros((N, 2))
 
+    for i in range(N):
         for j in range(N):
             if i != j:
                 r = pos[i] - pos[j]
@@ -105,8 +112,8 @@ def calculateAcceleration():
                 # Calculate the gradient of the kernel function
                 grad = np.array(gradW(r[0], r[1], dist))
 
-                # Calculate the pressure term contribution to acceleration
-                pressure_term = (
+                # Calculate the pressure gradient
+                pressure_grad = (
                     -mass
                     * (
                         pressure[i] / (density[i] ** 2)
@@ -115,8 +122,33 @@ def calculateAcceleration():
                     * grad
                 )
 
-                # Accumulate acceleration due to pressure
-                acc[i] += pressure_term
+                acc[i] += pressure_grad
+
+
+def timeStep(dt, ax, fig):
+    global vel, pos, acc
+    # (1/2) kick
+    vel += acc * dt / 2
+
+    # drift
+    pos += vel * dt
+
+    # update accelerations
+    calculateAcceleration()
+
+    # (1/2) kick
+    vel += acc * dt / 2
+
+    ax.clear()
+    ax.scatter(
+        pos[:, 0],
+        pos[:, 1],
+        s=40,
+        c=density,
+        picker=True,
+    )
+
+    fig.canvas.draw()
 
 
 def showWindow():
@@ -132,17 +164,16 @@ def showWindow():
         c=density,
         picker=True,
     )
+
     for i in range(N):
-        ax.arrow(
-            pos[i, 0],
-            pos[i, 1],
-            acc[i, 0],
-            acc[i, 1],
-            head_width=0.05,
-            head_length=0.1,
-            fc="red",
-            ec="red",
-        )
+        x = pos[i, 0]
+        y = pos[i, 1]
+
+        # acc arrow
+        a_x = acc[i, 0]
+        a_y = acc[i, 1]
+        ax.arrow(x, y, a_x, a_y, head_width=0.05, head_length=0.1, fc="red", ec="red")
+
     fig.canvas.mpl_connect("pick_event", lambda event: onPick(event, ax, fig))
     fig.canvas.mpl_connect("key_press_event", lambda event: onKeyPress(event, ax, fig))
 
@@ -150,37 +181,13 @@ def showWindow():
 
 
 def onKeyPress(event, ax, fig):
-    global vel, pos, acc
-    dt = 1
     if event.key == " ":
-        # (1/2) kick
-        vel += acc * dt / 2
-
-        # drift
-        pos += vel * dt
-
-        # update accelerations
-        calculateAcceleration()
-
-        # (1/2) kick
-        vel += acc * dt / 2
-        ax.clear()
-        ax.scatter(
-            pos[:, 0],
-            pos[:, 1],
-            s=40,
-            c=density,
-            picker=True,
-        )
-        fig.canvas.draw()
+        timeStep(1, ax, fig)
+        print("timestep")
 
 
 def onPick(event, ax, fig):
     ind = event.ind[0]  # Get the index of the clicked particle
-    x = pos[ind, 0]
-    y = pos[ind, 1]
-    a_x = acc[ind, 0]
-    a_y = acc[ind, 1]
 
     ax.clear()
     ax.scatter(
@@ -191,7 +198,19 @@ def onPick(event, ax, fig):
         picker=True,
     )
 
+    x = pos[ind, 0]
+    y = pos[ind, 1]
+
+    # acc arrow
+    a_x = acc[ind, 0]
+    a_y = acc[ind, 1]
     ax.arrow(x, y, a_x, a_y, head_width=0.05, head_length=0.1, fc="red", ec="red")
+
+    # vel arrow
+    v_x = vel[ind, 0]
+    v_y = vel[ind, 1]
+    ax.arrow(x, y, v_x, v_y, head_width=0.05, head_length=0.1, fc="blue", ec="blue")
+
     fig.canvas.draw()
 
     ind = event.ind
@@ -200,6 +219,8 @@ def onPick(event, ax, fig):
 
 def main():
     setPositionInGrid()
+    pos[0][0] = 0
+    calculateAcceleration()
     showWindow()
 
 
