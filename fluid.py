@@ -54,6 +54,7 @@ def gradW(x, y, h):
 
     wx = n * x
     wy = n * y
+
     return wx, wy
 
 
@@ -83,8 +84,12 @@ def getPressure(density, densityReference):
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, density, pressure, h):
-    gravity = (0, -2)
+def getAcceleration(N, mass, pos, densityReference, h):
+    density = getDensity(mass, N, pos, h)
+    pressure = getPressure(density, densityReference)
+
+    gravity = (0, -1)
+
     dx, dy = getPairwiseSeparations(pos, pos)
 
     # Calculate the gradient of the kernel function
@@ -105,49 +110,12 @@ def getAcceleration(N, mass, pos, density, pressure, h):
     return acc
 
 
-def timeStep(
-    N, mass, dt, acc, vel, pos, density, densityReference, pressure, h, ax, fig
-):
-    # (1/2) kick
-    vel += acc * dt / 2
-
-    # drift
-    pos += vel * dt
-
-    # update accelerations
-    density = getDensity(mass, N, pos, h)
-    pressure = getPressure(density, densityReference)
-    acc = getAcceleration(N, mass, pos, density, pressure, h)
-
-    # (1/2) kick
-    vel += acc * dt / 2
-
-    boundaryLeft = -10
-    boundaryRight = 10
-    boundaryTop = 100
-    boundaryBottom = -5
-
-    boundDamping = -0.5
-
-    vel[(pos[:, 0] > boundaryRight), 0] *= boundDamping
-    pos[(pos[:, 0] > boundaryRight), 0] = boundaryRight
-
-    vel[(pos[:, 0] < boundaryLeft), 0] *= boundDamping
-    pos[(pos[:, 0] < boundaryLeft), 0] = boundaryLeft
-
-    vel[(pos[:, 1] > boundaryTop), 1] *= boundDamping
-    pos[(pos[:, 1] > boundaryTop), 1] = boundaryTop
-
-    vel[(pos[:, 1] < boundaryBottom), 1] *= boundDamping
-    pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
-
-
 def main():
     # Simulation parameters
 
     # size of particle cube
-    nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 20  # number of particles in y direction
+    nParticlesX = 30  # number of particles in x direction
+    nParticlesY = 50  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.4  # m
@@ -164,14 +132,8 @@ def main():
 
     # initial positions of particles
     pos = getPositionInGrid(N, nParticlesX, nParticlesY, distance)  # m
-
-    # initial density of particles
-    density = getDensity(mass, N, pos, h)  # kg/m^2
-    # initial pressure of particles
-    pressure = getPressure(density, densityReference)  # Pa
     # initial acceleration of particles
-    acc = getAcceleration(N, mass, pos, density, pressure, h)  # m/s**2
-
+    acc = np.zeros((N, 2))  # m/s**2
     # initial velocity of particles
     vel = np.zeros((N, 2))  # m/s
 
@@ -179,22 +141,50 @@ def main():
     fig, ax = plt.subplots()
 
     maxT = 10000
-    dt = 0.05
+    dt = 0.04
 
     # main loop
     for t in range(maxT):
-        timeStep(
-            N, mass, dt, acc, vel, pos, density, densityReference, pressure, h, ax, fig
-        )
+        # (1/2) kick
+        vel += acc * dt / 2
+
+        # drift
+        pos += vel * dt
+
+        # collisions
+        boundaryLeft = -20
+        boundaryRight = 20
+        boundaryTop = 100
+        boundaryBottom = -5
+
+        boundDamping = -0.8
+
+        vel[(pos[:, 0] > boundaryRight), 0] *= boundDamping
+        pos[(pos[:, 0] > boundaryRight), 0] = boundaryRight
+
+        vel[(pos[:, 0] < boundaryLeft), 0] *= boundDamping
+        pos[(pos[:, 0] < boundaryLeft), 0] = boundaryLeft
+
+        vel[(pos[:, 1] > boundaryTop), 1] *= boundDamping
+        pos[(pos[:, 1] > boundaryTop), 1] = boundaryTop
+
+        vel[(pos[:, 1] < boundaryBottom), 1] *= boundDamping
+        pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
+
+        # update accelerations
+        acc = getAcceleration(N, mass, pos, densityReference, h)
+
+        # (1/2) kick
+        vel += acc * dt / 2
+
+        # update window
         plt.sca(ax)
         plt.cla()
-        plt.scatter(pos[:, 0], pos[:, 1], s=10, alpha=0.5)
-        ax.set(xlim=(-10, 10), ylim=(-10, 10))
-
+        plt.scatter(pos[:, 0], pos[:, 1], s=20, c=vel[:, 0] + vel[:, 1], alpha=0.5)
+        ax.set(xlim=(-20, 20), ylim=(-6, 20))
         plt.pause(0.0001)
 
     plt.show(block=False)
-    plt.close("all")
     return 0
 
 
