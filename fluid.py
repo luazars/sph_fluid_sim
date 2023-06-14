@@ -1,28 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import random
 
 
 # setting positions of particles to a random position on the screen
-def setRandomPosition(pos, N):
-    for i in range(N):
-        pos[i][0] = random.random()
-        pos[i][1] = random.random()
+def setRandomPosition(N):
+    return np.random.random((N, 2))
 
 
 # set position of particles in a cube
 def getPositionInGrid(N, nParticlesX, nParticlesY, distance):
-    pos = np.zeros((N, 2))
     # top-left position of particle cube
     xPos = 1 / 2 * (nParticlesX * distance)  # center the cube on x-axis
     yPos = 0.1
 
-    for i in range(N):
-        x = i % nParticlesX
-        y = int(i / N * nParticlesY)
+    pos = np.zeros((N, 2))
+    pos = np.zeros((N, 2))
+    x = np.tile(np.arange(nParticlesX), nParticlesY)
+    y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
-        pos[i][0] = x * distance + xPos
-        pos[i][1] = y * distance + yPos
+    pos[:, 0] = x * distance + xPos
+    pos[:, 1] = y * distance + yPos
 
     return pos
 
@@ -54,18 +51,22 @@ def getDensity(i, mass, N, pos, h):
 
 # calculate pressure with density of all particles with tait equation
 # https://de.wikipedia.org/wiki/Taitsche_Gleichung
-def getPressure(i, density, densityReference):
+def getPressure(density, densityReference):
     # speed of sound
     c = 5  # m/s
     # Adiabatenexponent
     m = 7
+    pressureReference = 0
+
     B = (densityReference * c**2) / m
-    return B * ((density / densityReference) ** m)  # Pa
+    return max(
+        0, B * (((density / densityReference) ** m) - 1) + pressureReference
+    )  # Pa
 
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, density, densityReference, pressure, h):
+def getAcceleration(N, mass, pos, density, pressure, h):
     # reset acceleration for particles
     acc = np.zeros((N, 2))
     for i in range(N):
@@ -88,6 +89,7 @@ def getAcceleration(N, mass, pos, density, densityReference, pressure, h):
                 )
 
                 acc[i] += pressure_grad
+    acc[:, 1] += -9.81
     return acc
 
 
@@ -100,12 +102,12 @@ def timeStep(
     # drift
     pos += vel * dt
 
-    # get initial density and pressure
     for i in range(N):
         density[i] = getDensity(i, mass, N, pos, h)
-        pressure[i] = getPressure(i, density[i], densityReference)
+        pressure[i] = getPressure(density[i], densityReference)
+
     # update accelerations
-    getAcceleration(N, mass, pos, density, densityReference, pressure, h)
+    acc = getAcceleration(N, mass, pos, density, pressure, h)
 
     # (1/2) kick
     vel += acc * dt / 2
@@ -129,7 +131,6 @@ def onKeyPress(
         timeStep(
             N, mass, 1, acc, vel, pos, density, densityReference, pressure, h, ax, fig
         )
-        print("timestep")
 
 
 def onPick(event, ax, fig, pos, density, pressure, acc, vel):
@@ -168,14 +169,13 @@ def main():
 
     # size of particle cube
     nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 20  # number of particles in y direction
+    nParticlesY = 10  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.4  # m
 
-    # kernel radiuss
+    # kernel radius
     h = np.sqrt(2) * distance  # m
-
     # number of particles
     N = nParticlesX * nParticlesY
 
@@ -195,12 +195,10 @@ def main():
     # get initial density and pressure
     for i in range(N):
         density[i] = getDensity(i, mass, N, pos, h)
-        pressure[i] = getPressure(i, density[i], densityReference)
+        pressure[i] = getPressure(density[i], densityReference)
 
     # initial acceleration of particles
-    acc = getAcceleration(
-        N, mass, pos, density, densityReference, pressure, h
-    )  # m/s**2
+    acc = getAcceleration(N, mass, pos, density, pressure, h)  # m/s**2
 
     # initial velocity of particles
     vel = np.zeros((N, 2))  # m/s
