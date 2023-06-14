@@ -84,11 +84,12 @@ def getPressure(density, densityReference):
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, densityReference, h):
+def getAcceleration(N, mass, pos, vel, densityReference, h):
     density = getDensity(mass, N, pos, h)
     pressure = getPressure(density, densityReference)
 
     gravity = (0, -1)
+    nu = 0.1
 
     dx, dy = getPairwiseSeparations(pos, pos)
 
@@ -105,8 +106,11 @@ def getAcceleration(N, mass, pos, densityReference, h):
 
     acc = np.hstack((ax, ay))
 
+    # gravity
     acc += gravity
 
+    # viscosity
+    acc -= nu * vel
     return acc
 
 
@@ -114,7 +118,7 @@ def main():
     # Simulation parameters
 
     # size of particle cube
-    nParticlesX = 30  # number of particles in x direction
+    nParticlesX = 20  # number of particles in x direction
     nParticlesY = 50  # number of particles in y direction
 
     # distance between Particles at start
@@ -141,7 +145,7 @@ def main():
     fig, ax = plt.subplots()
 
     maxT = 10000
-    dt = 0.04
+    dt = 0.05
 
     # main loop
     for t in range(maxT):
@@ -172,7 +176,7 @@ def main():
         pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
 
         # update accelerations
-        acc = getAcceleration(N, mass, pos, densityReference, h)
+        acc = getAcceleration(N, mass, pos, vel, densityReference, h)
 
         # (1/2) kick
         vel += acc * dt / 2
@@ -180,7 +184,7 @@ def main():
         # update window
         plt.sca(ax)
         plt.cla()
-        plt.scatter(pos[:, 0], pos[:, 1], s=20, c=vel[:, 0] + vel[:, 1], alpha=0.5)
+        plt.scatter(pos[:, 0], pos[:, 1], s=20, alpha=0.5)
         ax.set(xlim=(-20, 20), ylim=(-6, 20))
         plt.pause(0.0001)
 
