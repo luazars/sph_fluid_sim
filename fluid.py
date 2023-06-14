@@ -1,26 +1,20 @@
+import time
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-# setting positions of particles to a random position on the screen
-def setRandomPosition(N):
-    return np.random.random((N, 2))
 
 
 # set position of particles in a cube
 def getPositionInGrid(N, nParticlesX, nParticlesY, distance):
     # top-left position of particle cube
-    xPos = 1 / 2 * (nParticlesX * distance)  # center the cube on x-axis
-    yPos = 0.1
+    xPos = (nParticlesX * distance) / 2  # center the cube on x-axis
 
     pos = np.zeros((N, 2))
     pos = np.zeros((N, 2))
     x = np.tile(np.arange(nParticlesX), nParticlesY)
     y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
-    pos[:, 0] = x * distance + xPos
-    pos[:, 1] = y * distance + yPos
-
+    pos[:, 0] = x * distance - xPos
+    pos[:, 1] = y * distance
     return pos
 
 
@@ -89,7 +83,8 @@ def getAcceleration(N, mass, pos, density, pressure, h):
                 )
 
                 acc[i] += pressure_grad
-    acc[:, 1] += -9.81
+
+    acc[:, 1] += -2
     return acc
 
 
@@ -112,67 +107,35 @@ def timeStep(
     # (1/2) kick
     vel += acc * dt / 2
 
-    ax.clear()
-    ax.scatter(
-        pos[:, 0],
-        pos[:, 1],
-        s=40,
-        c=density,
-        picker=True,
-    )
+    boundaryLeft = -5
+    boundaryRight = 5
+    boundaryTop = 10
+    boundaryBottom = -5
 
-    fig.canvas.draw()
+    boundDamping = -0.5
 
+    vel[(pos[:, 0] > boundaryRight), 0] *= boundDamping
+    pos[(pos[:, 0] > boundaryRight), 0] = boundaryRight
 
-def onKeyPress(
-    event, ax, fig, acc, vel, pos, N, mass, density, densityReference, pressure, h
-):
-    if event.key == " ":
-        timeStep(
-            N, mass, 1, acc, vel, pos, density, densityReference, pressure, h, ax, fig
-        )
+    vel[(pos[:, 0] < boundaryLeft), 0] *= boundDamping
+    pos[(pos[:, 0] < boundaryLeft), 0] = boundaryLeft
 
+    vel[(pos[:, 1] > boundaryTop), 1] *= boundDamping
+    pos[(pos[:, 1] > boundaryTop), 1] = boundaryTop
 
-def onPick(event, ax, fig, pos, density, pressure, acc, vel):
-    ind = event.ind[0]  # Get the index of the clicked particle
-
-    ax.clear()
-    ax.scatter(
-        pos[:, 0],
-        pos[:, 1],
-        s=40,
-        c=density,
-        picker=True,
-    )
-
-    x = pos[ind, 0]
-    y = pos[ind, 1]
-
-    # acc arrow
-    a_x = acc[ind, 0]
-    a_y = acc[ind, 1]
-    ax.arrow(x, y, a_x, a_y, head_width=0.05, head_length=0.1, fc="red", ec="red")
-
-    # vel arrow
-    v_x = vel[ind, 0]
-    v_y = vel[ind, 1]
-    ax.arrow(x, y, v_x, v_y, head_width=0.05, head_length=0.1, fc="blue", ec="blue")
-
-    fig.canvas.draw()
-
-    ind = event.ind
-    print("index:", ind, "pressure:", pressure[ind], "density:", density[ind])
+    vel[(pos[:, 1] < boundaryBottom), 1] *= boundDamping
+    pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
 
 
 def main():
     # Simulation parameters
 
     # size of particle cube
-    nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 10  # number of particles in y direction
+    nParticlesX = 10  # number of particles in x direction
+    nParticlesY = 20  # number of particles in y direction
 
     # distance between Particles at start
-    distance = 0.4  # m
+    distance = 0.3  # m
 
     # kernel radius
     h = np.sqrt(2) * distance  # m
@@ -205,50 +168,26 @@ def main():
 
     # show window
     fig, ax = plt.subplots()
+    plt.ion()
 
-    x = pos[:, 0]
-    y = pos[:, 1]
+    maxT = 10000
+    dt = 0.05
 
-    ax.scatter(
-        x,
-        y,
-        s=40,
-        c=density,
-        picker=True,
-    )
+    # main loop
+    for t in range(maxT):
+        timeStep(
+            N, mass, dt, acc, vel, pos, density, densityReference, pressure, h, ax, fig
+        )
+        plt.sca(ax)
+        plt.cla()
+        plt.scatter(pos[:, 0], pos[:, 1], s=10, c=density, alpha=0.5)
+        ax.set(xlim=(-10, 10), ylim=(-10, 10))
 
-    for i in range(N):
-        x = pos[i, 0]
-        y = pos[i, 1]
+        plt.pause(0.001)
 
-        # acc arrow
-        a_x = acc[i, 0]
-        a_y = acc[i, 1]
-        ax.arrow(x, y, a_x, a_y, head_width=0.05, head_length=0.1, fc="red", ec="red")
-
-    fig.canvas.mpl_connect(
-        "pick_event",
-        lambda event: onPick(event, ax, fig, pos, density, pressure, acc, vel),
-    )
-    fig.canvas.mpl_connect(
-        "key_press_event",
-        lambda event: onKeyPress(
-            event,
-            ax,
-            fig,
-            acc,
-            vel,
-            pos,
-            N,
-            mass,
-            density,
-            densityReference,
-            pressure,
-            h,
-        ),
-    )
-
-    plt.show()
+    plt.show(block=False)
+    plt.close("all")
+    return 0
 
 
 if __name__ == "__main__":
