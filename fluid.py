@@ -3,6 +3,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+# https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
+def getPairwiseSeparations(ri, rj):
+    M = ri.shape[0]
+    N = rj.shape[0]
+
+    # positions ri = (x,y)
+    rix = ri[:, 0].reshape((M, 1))
+    riy = ri[:, 1].reshape((M, 1))
+
+    # other set of points positions rj = (x,y)
+    rjx = rj[:, 0].reshape((N, 1))
+    rjy = rj[:, 1].reshape((N, 1))
+
+    # matrices that store all pairwise particle separations: r_i - r_j
+    dx = rix - rjx.T
+    dy = riy - rjy.T
+
+    return dx, dy
+
+
 # set position of particles in a cube
 def getPositionInGrid(N, nParticlesX, nParticlesY, distance):
     # top-left position of particle cube
@@ -20,14 +40,18 @@ def getPositionInGrid(N, nParticlesX, nParticlesY, distance):
 
 # kernel function / W function
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def W(r, h):
+def W(x, y, h):
     # kernel radius, include all surrounding particles of one particle in a grid
+    r = np.sqrt(x**2 + y**2)
     return (1.0 / (h * np.sqrt(np.pi))) ** 3 * np.exp(-(r**2) / h**2)
 
 
 # gradient of the kernel function
-def gradW(x, y, r, h):
+def gradW(x, y, h):
+    r = np.sqrt(x**2 + y**2)
+
     n = -2 * np.exp(-(r**2) / h**2) / h**5 / (np.pi) ** (3 / 2)
+
     wx = n * x
     wy = n * y
     return wx, wy
@@ -35,11 +59,9 @@ def gradW(x, y, r, h):
 
 # calculate density of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getDensity(i, mass, N, pos, h):
-    density = 0
-    for j in range(N):
-        r = np.linalg.norm(pos[i] - pos[j])
-        density += mass * W(r, h)
+def getDensity(mass, N, pos, h):
+    dx, dy = getPairwiseSeparations(pos, pos)
+    density = np.sum(mass * W(dx, dy, h), 1).reshape((N, 1))
     return density
 
 
@@ -53,38 +75,33 @@ def getPressure(density, densityReference):
     pressureReference = 0
 
     B = (densityReference * c**2) / m
-    return max(
-        0, B * (((density / densityReference) ** m) - 1) + pressureReference
-    )  # Pa
+
+    pressure = B * (((density / densityReference) ** m) - 1) + pressureReference
+    pressure = np.maximum(pressure, 0)
+    return pressure  # Pa
 
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
 def getAcceleration(N, mass, pos, density, pressure, h):
-    # reset acceleration for particles
-    acc = np.zeros((N, 2))
-    for i in range(N):
-        for j in range(N):
-            if i != j:
-                r = pos[i] - pos[j]
-                dist = np.linalg.norm(r)
+    gravity = (0, -2)
+    dx, dy = getPairwiseSeparations(pos, pos)
 
-                # Calculate the gradient of the kernel function
-                grad = np.array(gradW(r[0], r[1], dist, h))
+    # Calculate the gradient of the kernel function
+    dWx, dWy = np.array(gradW(dx, dy, h))
 
-                # Calculate the pressure gradient
-                pressure_grad = (
-                    -mass
-                    * (
-                        pressure[i] / (density[i] ** 2)
-                        + pressure[j] / (density[j] ** 2)
-                    )
-                    * grad
-                )
+    # Calculate the pressure gradient
+    ax = np.sum(
+        -mass * (pressure / (density.T**2) + pressure.T / (density.T**2)) * dWx, 1
+    ).reshape((N, 1))
+    ay = np.sum(
+        -mass * (pressure / (density.T**2) + pressure.T / (density.T**2)) * dWy, 1
+    ).reshape((N, 1))
 
-                acc[i] += pressure_grad
+    acc = np.hstack((ax, ay))
 
-    acc[:, 1] += -2
+    acc += gravity
+
     return acc
 
 
@@ -97,19 +114,17 @@ def timeStep(
     # drift
     pos += vel * dt
 
-    for i in range(N):
-        density[i] = getDensity(i, mass, N, pos, h)
-        pressure[i] = getPressure(density[i], densityReference)
-
     # update accelerations
+    density = getDensity(mass, N, pos, h)
+    pressure = getPressure(density, densityReference)
     acc = getAcceleration(N, mass, pos, density, pressure, h)
 
     # (1/2) kick
     vel += acc * dt / 2
 
-    boundaryLeft = -5
-    boundaryRight = 5
-    boundaryTop = 10
+    boundaryLeft = -10
+    boundaryRight = 10
+    boundaryTop = 100
     boundaryBottom = -5
 
     boundDamping = -0.5
@@ -131,11 +146,11 @@ def main():
     # Simulation parameters
 
     # size of particle cube
-    nParticlesX = 10  # number of particles in x direction
+    nParticlesX = 20  # number of particles in x direction
     nParticlesY = 20  # number of particles in y direction
 
     # distance between Particles at start
-    distance = 0.3  # m
+    distance = 0.4  # m
 
     # kernel radius
     h = np.sqrt(2) * distance  # m
@@ -150,16 +165,10 @@ def main():
     # initial positions of particles
     pos = getPositionInGrid(N, nParticlesX, nParticlesY, distance)  # m
 
-    # density of particles
-    density = np.zeros(N)  # kg/m^2
-    # pressure of particles
-    pressure = np.zeros(N)  # Pa
-
-    # get initial density and pressure
-    for i in range(N):
-        density[i] = getDensity(i, mass, N, pos, h)
-        pressure[i] = getPressure(density[i], densityReference)
-
+    # initial density of particles
+    density = getDensity(mass, N, pos, h)  # kg/m^2
+    # initial pressure of particles
+    pressure = getPressure(density, densityReference)  # Pa
     # initial acceleration of particles
     acc = getAcceleration(N, mass, pos, density, pressure, h)  # m/s**2
 
@@ -168,7 +177,6 @@ def main():
 
     # show window
     fig, ax = plt.subplots()
-    plt.ion()
 
     maxT = 10000
     dt = 0.05
@@ -180,10 +188,10 @@ def main():
         )
         plt.sca(ax)
         plt.cla()
-        plt.scatter(pos[:, 0], pos[:, 1], s=10, c=density, alpha=0.5)
+        plt.scatter(pos[:, 0], pos[:, 1], s=10, alpha=0.5)
         ax.set(xlim=(-10, 10), ylim=(-10, 10))
 
-        plt.pause(0.001)
+        plt.pause(0.0001)
 
     plt.show(block=False)
     plt.close("all")
