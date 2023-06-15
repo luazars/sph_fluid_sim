@@ -84,12 +84,11 @@ def getPressure(density, densityReference):
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, vel, densityReference, h):
+def getAcceleration(N, mass, pos, vel, densityReference, h, nu):
     density = getDensity(mass, N, pos, h)
     pressure = getPressure(density, densityReference)
 
     gravity = (0, -1)
-    nu = 0.1
 
     dx, dy = getPairwiseSeparations(pos, pos)
 
@@ -118,11 +117,11 @@ def main():
     # Simulation parameters
 
     # size of particle cube
-    nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 50  # number of particles in y direction
+    nParticlesX = 10  # number of particles in x direction
+    nParticlesY = 20  # number of particles in y direction
 
     # distance between Particles at start
-    distance = 0.4  # m
+    distance = 0.5  # m
 
     # kernel radius
     h = np.sqrt(2) * distance  # m
@@ -130,6 +129,8 @@ def main():
     N = nParticlesX * nParticlesY
 
     densityReference = 1000  # kg/m^2
+
+    nu = 0.1
 
     # mass particle
     mass = densityReference * distance**2  # kg
@@ -145,7 +146,7 @@ def main():
     fig, ax = plt.subplots()
 
     maxT = 10000
-    dt = 0.05
+    dt = 0.1
 
     # main loop
     for t in range(maxT):
@@ -159,7 +160,7 @@ def main():
         boundaryLeft = -20
         boundaryRight = 20
         boundaryTop = 100
-        boundaryBottom = -5
+        boundaryBottom = -3
 
         boundDamping = -0.8
 
@@ -176,7 +177,7 @@ def main():
         pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
 
         # update accelerations
-        acc = getAcceleration(N, mass, pos, vel, densityReference, h)
+        acc = getAcceleration(N, mass, pos, vel, densityReference, h, nu)
 
         # (1/2) kick
         vel += acc * dt / 2
@@ -184,7 +185,13 @@ def main():
         # update window
         plt.sca(ax)
         plt.cla()
-        plt.scatter(pos[:, 0], pos[:, 1], s=20, alpha=0.5)
+        plt.scatter(
+            pos[:, 0],
+            pos[:, 1],
+            s=20,
+            alpha=0.5,
+            c=np.sqrt(vel[:, 0] ** 2 + vel[:, 1] ** 2),
+        )
         ax.set(xlim=(-20, 20), ylim=(-6, 20))
         plt.pause(0.0001)
 
