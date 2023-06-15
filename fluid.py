@@ -24,18 +24,38 @@ def getPairwiseSeparations(ri, rj):
 
 
 # set position of particles in a cube
-def getPositionInGrid(N, nParticlesX, nParticlesY, distance):
+def getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance):
     # top-left position of particle cube
     xPos = (nParticlesX * distance) / 2  # center the cube on x-axis
 
     pos = np.zeros((N, 2))
-    pos = np.zeros((N, 2))
+
     x = np.tile(np.arange(nParticlesX), nParticlesY)
     y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
     pos[:, 0] = x * distance - xPos
     pos[:, 1] = y * distance
-    return pos
+
+    colors = np.full(N, "yellow")
+
+    for i in range(N):
+        if pos[i, 0] < 0:
+            pos[i, 0] -= 3
+            if pos[i, 1] > 10:
+                pos[i, 1] += 10
+                colors[i] = "red"
+            else:
+                colors[i] = "blue"
+
+        else:
+            pos[i, 0] += 3
+            if pos[i, 1] > 10:
+                pos[i, 1] += 10
+                colors[i] = "yellow"
+            else:
+                colors[i] = "green"
+
+    return pos, colors
 
 
 # kernel function / W function
@@ -117,8 +137,8 @@ def main():
     # Simulation parameters
 
     # size of particle cube
-    nParticlesX = 10  # number of particles in x direction
-    nParticlesY = 20  # number of particles in y direction
+    nParticlesX = 40  # number of particles in x direction
+    nParticlesY = 40  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.5  # m
@@ -130,13 +150,13 @@ def main():
 
     densityReference = 1000  # kg/m^2
 
-    nu = 0.1
+    nu = 0.5
 
     # mass particle
     mass = densityReference * distance**2  # kg
 
     # initial positions of particles
-    pos = getPositionInGrid(N, nParticlesX, nParticlesY, distance)  # m
+    pos, colors = getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance)  # m
     # initial acceleration of particles
     acc = np.zeros((N, 2))  # m/s**2
     # initial velocity of particles
@@ -147,6 +167,8 @@ def main():
 
     maxT = 10000
     dt = 0.1
+
+    plt.show(block=False)
 
     # main loop
     for t in range(maxT):
@@ -190,12 +212,11 @@ def main():
             pos[:, 1],
             s=20,
             alpha=0.5,
-            c=np.sqrt(vel[:, 0] ** 2 + vel[:, 1] ** 2),
+            c=colors,
         )
         ax.set(xlim=(-20, 20), ylim=(-6, 20))
         plt.pause(0.0001)
 
-    plt.show(block=False)
     return 0
 
 
