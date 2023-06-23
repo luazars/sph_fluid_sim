@@ -102,6 +102,8 @@ def timeStep(
     # drift
     pos += vel * dt
 
+    pos, vel = boundaries(pos, N, vel)
+
     for i in range(N):
         density[i] = getDensity(i, mass, N, pos, h)
         pressure[i] = getPressure(density[i], densityReference)
@@ -129,7 +131,7 @@ def onKeyPress(
 ):
     if event.key == " ":
         timeStep(
-            N, mass, 1, acc, vel, pos, density, densityReference, pressure, h, ax, fig
+            N, mass, 0.1, acc, vel, pos, density, densityReference, pressure, h, ax, fig
         )
 
 
@@ -164,12 +166,41 @@ def onPick(event, ax, fig, pos, density, pressure, acc, vel):
     print("index:", ind, "pressure:", pressure[ind], "density:", density[ind])
 
 
+def boundaries(pos, N, vel):
+
+    # Grenzen für den Plot
+    x_lower_bound = 0
+    x_upper_bound = 15
+    y_lower_bound = -1
+    y_upper_bound = 100
+
+
+    for i in range(N):
+        if pos[i, 0] < x_lower_bound:
+            pos[i, 0] = x_lower_bound
+            vel[i, 0] = -vel[i, 0]
+        if pos[i, 0] > x_upper_bound:
+            pos[i, 0] = x_upper_bound
+            vel[i, 0] = -vel[i, 0]
+        if pos[i, 1] > y_upper_bound:
+            pos[i, 1] = y_upper_bound
+            vel[i, 1] = -vel[i, 1]
+        if pos[i, 1] < y_lower_bound:
+            pos[i, 1] = y_lower_bound
+            vel[i, 1] = -vel[i, 1]
+    
+
+    return pos, vel
+        
+
+
+
 def main():
     # Simulation parameters
 
     # size of particle cube
     nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 10  # number of particles in y direction
+    nParticlesY = 20  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.4  # m
@@ -206,8 +237,11 @@ def main():
     # show window
     fig, ax = plt.subplots()
 
+
     x = pos[:, 0]
     y = pos[:, 1]
+
+    
 
     ax.scatter(
         x,
