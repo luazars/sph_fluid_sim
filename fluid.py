@@ -1,51 +1,68 @@
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-# setting positions of particles to a random position on the screen
-def setRandomPosition(N):
-    return np.random.random((N, 2))
+# https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
+def getPairwiseSeparations(ri, rj):
+    M = ri.shape[0]
+    N = rj.shape[0]
+
+    # positions ri = (x,y)
+    rix = ri[:, 0].reshape((M, 1))
+    riy = ri[:, 1].reshape((M, 1))
+
+    # other set of points positions rj = (x,y)
+    rjx = rj[:, 0].reshape((N, 1))
+    rjy = rj[:, 1].reshape((N, 1))
+
+    # matrices that store all pairwise particle separations: r_i - r_j
+    dx = rix - rjx.T
+    dy = riy - rjy.T
+
+    return dx, dy
 
 
 # set position of particles in a cube
 def getPositionInGrid(N, nParticlesX, nParticlesY, distance):
     # top-left position of particle cube
-    xPos = 1 / 2 * (nParticlesX * distance)  # center the cube on x-axis
-    yPos = 0.1
+    xPos = (nParticlesX * distance) / 2  # center the cube on x-axis
 
     pos = np.zeros((N, 2))
     pos = np.zeros((N, 2))
     x = np.tile(np.arange(nParticlesX), nParticlesY)
     y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
-    pos[:, 0] = x * distance + xPos
-    pos[:, 1] = y * distance + yPos
-
+    pos[:, 0] = x * distance - xPos
+    pos[:, 1] = y * distance
     return pos
 
 
 # kernel function / W function
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def W(r, h):
+def W(x, y, h):
     # kernel radius, include all surrounding particles of one particle in a grid
+    r = np.sqrt(x**2 + y**2)
     return (1.0 / (h * np.sqrt(np.pi))) ** 3 * np.exp(-(r**2) / h**2)
 
 
 # gradient of the kernel function
-def gradW(x, y, r, h):
+def gradW(x, y, h):
+    r = np.sqrt(x**2 + y**2)
+
     n = -2 * np.exp(-(r**2) / h**2) / h**5 / (np.pi) ** (3 / 2)
+
     wx = n * x
     wy = n * y
+
     return wx, wy
 
 
 # calculate density of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getDensity(i, mass, N, pos, h):
-    density = 0
-    for j in range(N):
-        r = np.linalg.norm(pos[i] - pos[j])
-        density += mass * W(r, h)
+def getDensity(mass, N, pos, h):
+    dx, dy = getPairwiseSeparations(pos, pos)
+    density = np.sum(mass * W(dx, dy, h), 1).reshape((N, 1))
     return density
 
 
@@ -59,109 +76,42 @@ def getPressure(density, densityReference):
     pressureReference = 0
 
     B = (densityReference * c**2) / m
-    return max(
-        0, B * (((density / densityReference) ** m) - 1) + pressureReference
-    )  # Pa
+
+    pressure = B * (((density / densityReference) ** m) - 1) + pressureReference
+    pressure = np.maximum(pressure, 0)
+    return pressure  # Pa
 
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, density, pressure, h):
-    # reset acceleration for particles
-    acc = np.zeros((N, 2))
-    for i in range(N):
-        for j in range(N):
-            if i != j:
-                r = pos[i] - pos[j]
-                dist = np.linalg.norm(r)
+def getAcceleration(N, mass, pos, vel, densityReference, h):
+    density = getDensity(mass, N, pos, h)
+    pressure = getPressure(density, densityReference)
 
-                # Calculate the gradient of the kernel function
-                grad = np.array(gradW(r[0], r[1], dist, h))
+    gravity = (0, -1)
+    nu = 0.1
 
-                # Calculate the pressure gradient
-                pressure_grad = (
-                    -mass
-                    * (
-                        pressure[i] / (density[i] ** 2)
-                        + pressure[j] / (density[j] ** 2)
-                    )
-                    * grad
-                )
+    dx, dy = getPairwiseSeparations(pos, pos)
 
-                acc[i] += pressure_grad
-    acc[:, 1] += -9.81
+    # Calculate the gradient of the kernel function
+    dWx, dWy = np.array(gradW(dx, dy, h))
+
+    # Calculate the pressure gradient
+    ax = np.sum(
+        -mass * (pressure / (density.T**2) + pressure.T / (density.T**2)) * dWx, 1
+    ).reshape((N, 1))
+    ay = np.sum(
+        -mass * (pressure / (density.T**2) + pressure.T / (density.T**2)) * dWy, 1
+    ).reshape((N, 1))
+
+    acc = np.hstack((ax, ay))
+
+    # gravity
+    acc += gravity
+
+    # viscosity
+    acc -= nu * vel
     return acc
-
-
-def timeStep(
-    N, mass, dt, acc, vel, pos, density, densityReference, pressure, h, ax, fig
-):
-    # (1/2) kick
-    vel += acc * dt / 2
-
-    # drift
-    pos += vel * dt
-
-    for i in range(N):
-        density[i] = getDensity(i, mass, N, pos, h)
-        pressure[i] = getPressure(density[i], densityReference)
-
-    # update accelerations
-    acc = getAcceleration(N, mass, pos, density, pressure, h)
-
-    # (1/2) kick
-    vel += acc * dt / 2
-
-    ax.clear()
-    ax.scatter(
-        pos[:, 0],
-        pos[:, 1],
-        s=40,
-        c=density,
-        picker=True,
-    )
-
-    fig.canvas.draw()
-
-
-def onKeyPress(
-    event, ax, fig, acc, vel, pos, N, mass, density, densityReference, pressure, h
-):
-    if event.key == " ":
-        timeStep(
-            N, mass, 1, acc, vel, pos, density, densityReference, pressure, h, ax, fig
-        )
-
-
-def onPick(event, ax, fig, pos, density, pressure, acc, vel):
-    ind = event.ind[0]  # Get the index of the clicked particle
-
-    ax.clear()
-    ax.scatter(
-        pos[:, 0],
-        pos[:, 1],
-        s=40,
-        c=density,
-        picker=True,
-    )
-
-    x = pos[ind, 0]
-    y = pos[ind, 1]
-
-    # acc arrow
-    a_x = acc[ind, 0]
-    a_y = acc[ind, 1]
-    ax.arrow(x, y, a_x, a_y, head_width=0.05, head_length=0.1, fc="red", ec="red")
-
-    # vel arrow
-    v_x = vel[ind, 0]
-    v_y = vel[ind, 1]
-    ax.arrow(x, y, v_x, v_y, head_width=0.05, head_length=0.1, fc="blue", ec="blue")
-
-    fig.canvas.draw()
-
-    ind = event.ind
-    print("index:", ind, "pressure:", pressure[ind], "density:", density[ind])
 
 
 def main():
@@ -169,7 +119,7 @@ def main():
 
     # size of particle cube
     nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 10  # number of particles in y direction
+    nParticlesY = 50  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.4  # m
@@ -186,69 +136,60 @@ def main():
 
     # initial positions of particles
     pos = getPositionInGrid(N, nParticlesX, nParticlesY, distance)  # m
-
-    # density of particles
-    density = np.zeros(N)  # kg/m^2
-    # pressure of particles
-    pressure = np.zeros(N)  # Pa
-
-    # get initial density and pressure
-    for i in range(N):
-        density[i] = getDensity(i, mass, N, pos, h)
-        pressure[i] = getPressure(density[i], densityReference)
-
     # initial acceleration of particles
-    acc = getAcceleration(N, mass, pos, density, pressure, h)  # m/s**2
-
+    acc = np.zeros((N, 2))  # m/s**2
     # initial velocity of particles
     vel = np.zeros((N, 2))  # m/s
 
     # show window
     fig, ax = plt.subplots()
 
-    x = pos[:, 0]
-    y = pos[:, 1]
+    maxT = 10000
+    dt = 0.05
 
-    ax.scatter(
-        x,
-        y,
-        s=40,
-        c=density,
-        picker=True,
-    )
+    # main loop
+    for t in range(maxT):
+        # (1/2) kick
+        vel += acc * dt / 2
 
-    for i in range(N):
-        x = pos[i, 0]
-        y = pos[i, 1]
+        # drift
+        pos += vel * dt
 
-        # acc arrow
-        a_x = acc[i, 0]
-        a_y = acc[i, 1]
-        ax.arrow(x, y, a_x, a_y, head_width=0.05, head_length=0.1, fc="red", ec="red")
+        # collisions
+        boundaryLeft = -20
+        boundaryRight = 20
+        boundaryTop = 100
+        boundaryBottom = -5
 
-    fig.canvas.mpl_connect(
-        "pick_event",
-        lambda event: onPick(event, ax, fig, pos, density, pressure, acc, vel),
-    )
-    fig.canvas.mpl_connect(
-        "key_press_event",
-        lambda event: onKeyPress(
-            event,
-            ax,
-            fig,
-            acc,
-            vel,
-            pos,
-            N,
-            mass,
-            density,
-            densityReference,
-            pressure,
-            h,
-        ),
-    )
+        boundDamping = -0.8
 
-    plt.show()
+        vel[(pos[:, 0] > boundaryRight), 0] *= boundDamping
+        pos[(pos[:, 0] > boundaryRight), 0] = boundaryRight
+
+        vel[(pos[:, 0] < boundaryLeft), 0] *= boundDamping
+        pos[(pos[:, 0] < boundaryLeft), 0] = boundaryLeft
+
+        vel[(pos[:, 1] > boundaryTop), 1] *= boundDamping
+        pos[(pos[:, 1] > boundaryTop), 1] = boundaryTop
+
+        vel[(pos[:, 1] < boundaryBottom), 1] *= boundDamping
+        pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
+
+        # update accelerations
+        acc = getAcceleration(N, mass, pos, vel, densityReference, h)
+
+        # (1/2) kick
+        vel += acc * dt / 2
+
+        # update window
+        plt.sca(ax)
+        plt.cla()
+        plt.scatter(pos[:, 0], pos[:, 1], s=20, alpha=0.5)
+        ax.set(xlim=(-20, 20), ylim=(-6, 20))
+        plt.pause(0.0001)
+
+    plt.show(block=False)
+    return 0
 
 
 if __name__ == "__main__":
