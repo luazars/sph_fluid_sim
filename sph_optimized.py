@@ -24,18 +24,38 @@ def getPairwiseSeparations(ri, rj):
 
 
 # set position of particles in a cube
-def getPositionInGrid(N, nParticlesX, nParticlesY, distance):
+def getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance):
     # top-left position of particle cube
     xPos = (nParticlesX * distance) / 2  # center the cube on x-axis
 
     pos = np.zeros((N, 2))
-    pos = np.zeros((N, 2))
+
     x = np.tile(np.arange(nParticlesX), nParticlesY)
     y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
     pos[:, 0] = x * distance - xPos
-    pos[:, 1] = y * distance
-    return pos
+    pos[:, 1] = y * distance + 10
+
+    colors = np.full(N, "yellow")
+
+    # for i in range(N):
+    #     if pos[i, 0] < 0:
+    #         pos[i, 0] -= 3
+    #         if pos[i, 1] > 10:
+    #             pos[i, 1] += 10
+    #             colors[i] = "red"
+    #         else:
+    #             colors[i] = "blue"
+
+    #     else:
+    #         pos[i, 0] += 3
+    #         if pos[i, 1] > 10:
+    #             pos[i, 1] += 10
+    #             colors[i] = "yellow"
+    #         else:
+    #             colors[i] = "green"
+
+    return pos, colors
 
 
 # kernel function / W function
@@ -84,12 +104,11 @@ def getPressure(density, densityReference):
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, vel, densityReference, h):
+def getAcceleration(N, mass, pos, vel, densityReference, h, nu):
     density = getDensity(mass, N, pos, h)
     pressure = getPressure(density, densityReference)
 
-    gravity = (0, -1)
-    nu = 0.1
+    gravity = (0, -2)
 
     dx, dy = getPairwiseSeparations(pos, pos)
 
@@ -111,31 +130,40 @@ def getAcceleration(N, mass, pos, vel, densityReference, h):
 
     # viscosity
     acc -= nu * vel
+
     return acc
 
 
 def main():
     # Simulation parameters
 
+    simulateInRealtime = False
+
+    if simulateInRealtime == False:
+        positions = []
+        oldT = 0
+
     # size of particle cube
     nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 50  # number of particles in y direction
+    nParticlesY = 200  # number of particles in y direction
 
     # distance between Particles at start
-    distance = 0.4  # m
+    distance = 0.5  # m
 
     # kernel radius
     h = np.sqrt(2) * distance  # m
     # number of particles
     N = nParticlesX * nParticlesY
 
-    densityReference = 1000  # kg/m^2
+    densityReference = 700  # kg/m^2
+
+    nu = 0.2
 
     # mass particle
     mass = densityReference * distance**2  # kg
 
     # initial positions of particles
-    pos = getPositionInGrid(N, nParticlesX, nParticlesY, distance)  # m
+    pos, colors = getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance)  # m
     # initial acceleration of particles
     acc = np.zeros((N, 2))  # m/s**2
     # initial velocity of particles
@@ -144,8 +172,13 @@ def main():
     # show window
     fig, ax = plt.subplots()
 
-    maxT = 10000
-    dt = 0.05
+    maxT = 1000
+    dt = 0.06
+
+    oldTime = time.time()
+
+    if simulateInRealtime:
+        plt.show(block=False)
 
     # main loop
     for t in range(maxT):
@@ -156,39 +189,76 @@ def main():
         pos += vel * dt
 
         # collisions
-        boundaryLeft = -20
-        boundaryRight = 20
-        boundaryTop = 100
-        boundaryBottom = -5
+        boundaryLeft = -30
+        boundaryRight = 30
+        boundaryTop = 1000
+        boundaryBottom = 0
 
-        boundDamping = -0.8
+        boundDamping = -0.4
+        boundFix = 0.1
 
-        vel[(pos[:, 0] > boundaryRight), 0] *= boundDamping
-        pos[(pos[:, 0] > boundaryRight), 0] = boundaryRight
+        # Check if particles collide with the boundaries
+        out_of_bounds_left = pos[:, 0] <= boundaryLeft
+        out_of_bounds_right = pos[:, 0] >= boundaryRight
+        out_of_bounds_top = pos[:, 1] >= boundaryTop
+        out_of_bounds_bottom = pos[:, 1] <= boundaryBottom
 
-        vel[(pos[:, 0] < boundaryLeft), 0] *= boundDamping
-        pos[(pos[:, 0] < boundaryLeft), 0] = boundaryLeft
+        # Reflect velocities
+        vel[out_of_bounds_left, 0] *= boundDamping
+        vel[out_of_bounds_right, 0] *= boundDamping
+        vel[out_of_bounds_top, 1] *= boundDamping
+        vel[out_of_bounds_bottom, 1] *= boundDamping
 
-        vel[(pos[:, 1] > boundaryTop), 1] *= boundDamping
-        pos[(pos[:, 1] > boundaryTop), 1] = boundaryTop
+        # Add small vel to prevent particles of getting stuck in the border
+        vel[out_of_bounds_left, 0] += boundFix
+        vel[out_of_bounds_right, 0] -= boundFix
+        vel[out_of_bounds_top, 1] -= boundFix
+        vel[out_of_bounds_bottom, 1] += boundFix
 
-        vel[(pos[:, 1] < boundaryBottom), 1] *= boundDamping
-        pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
+        # Update positions
+        pos[out_of_bounds_left, 0] = boundaryLeft
+        pos[out_of_bounds_right, 0] = boundaryRight
+        pos[out_of_bounds_top, 1] = boundaryTop
+        pos[out_of_bounds_bottom, 1] = boundaryBottom
 
         # update accelerations
-        acc = getAcceleration(N, mass, pos, vel, densityReference, h)
+        acc = getAcceleration(N, mass, pos, vel, densityReference, h, nu)
 
         # (1/2) kick
         vel += acc * dt / 2
 
-        # update window
-        plt.sca(ax)
-        plt.cla()
-        plt.scatter(pos[:, 0], pos[:, 1], s=20, alpha=0.5)
-        ax.set(xlim=(-20, 20), ylim=(-6, 20))
-        plt.pause(0.0001)
+        if simulateInRealtime:
+            # update window
+            plt.sca(ax)
+            plt.cla()
+            plt.scatter(
+                pos[:, 0],
+                pos[:, 1],
+                s=40,
+                alpha=0.5,
+                c=colors,
+            )
+            ax.set(xlim=(-60, 60), ylim=(-10, 110))
+            plt.pause(0.0001)
+        else:
+            positions.append(pos.copy())
 
-    plt.show(block=False)
+            if oldT < np.round((t / maxT) * 100):
+                oldT = np.round((t / maxT) * 100)
+                realDT = time.time() - oldTime
+                oldTime = time.time()
+
+                print(
+                    oldT,
+                    "%, remaining:",
+                    np.round((realDT * (100 - oldT)) / 60, 3),
+                    "min",
+                )
+
+    if simulateInRealtime == False:
+        positions = np.array(positions)
+        np.save("saved_positions/positions.npy", positions)
+
     return 0
 
 
