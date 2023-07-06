@@ -1,4 +1,3 @@
-import time
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -38,22 +37,22 @@ def getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance):
 
     colors = np.full(N, "yellow")
 
-    for i in range(N):
-        if pos[i, 0] < 0:
-            pos[i, 0] -= 3
-            if pos[i, 1] > 10:
-                pos[i, 1] += 10
-                colors[i] = "red"
-            else:
-                colors[i] = "blue"
+    # for i in range(N):
+    #     if pos[i, 0] < 0:
+    #         pos[i, 0] -= 3
+    #         if pos[i, 1] > 10:
+    #             pos[i, 1] += 10
+    #             colors[i] = "red"
+    #         else:
+    #             colors[i] = "blue"
 
-        else:
-            pos[i, 0] += 3
-            if pos[i, 1] > 10:
-                pos[i, 1] += 10
-                colors[i] = "yellow"
-            else:
-                colors[i] = "green"
+    #     else:
+    #         pos[i, 0] += 3
+    #         if pos[i, 1] > 10:
+    #             pos[i, 1] += 10
+    #             colors[i] = "yellow"
+    #         else:
+    #             colors[i] = "green"
 
     return pos, colors
 
@@ -104,7 +103,7 @@ def getPressure(density, densityReference):
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, vel, densityReference, h, nu):
+def getABecceleration(N, mass, pos, vel, densityReference, h, nu):
     density = getDensity(mass, N, pos, h)
     pressure = getPressure(density, densityReference)
 
@@ -130,15 +129,22 @@ def getAcceleration(N, mass, pos, vel, densityReference, h, nu):
 
     # viscosity
     acc -= nu * vel
-    return acc
+
+    return acc, pressure
 
 
 def main():
     # Simulation parameters
 
+    simulateInRealtime = True
+
+    if simulateInRealtime == False:
+        positions = []
+        oldT = 0
+
     # size of particle cube
-    nParticlesX = 40  # number of particles in x direction
-    nParticlesY = 40  # number of particles in y direction
+    nParticlesX = 1  # number of particles in x direction
+    nParticlesY = 100  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.5  # m
@@ -150,7 +156,7 @@ def main():
 
     densityReference = 1000  # kg/m^2
 
-    nu = 0.5
+    nu = 0.2
 
     # mass particle
     mass = densityReference * distance**2  # kg
@@ -165,10 +171,11 @@ def main():
     # show window
     fig, ax = plt.subplots()
 
-    maxT = 10000
-    dt = 0.1
+    maxT = 1000
+    dt = 0.06
 
-    plt.show(block=False)
+    if simulateInRealtime:
+        plt.show(block=False)
 
     # main loop
     for t in range(maxT):
@@ -181,41 +188,71 @@ def main():
         # collisions
         boundaryLeft = -20
         boundaryRight = 20
-        boundaryTop = 100
+        boundaryTop = 1000
         boundaryBottom = -3
 
-        boundDamping = -0.8
+        # if t > 400:
+        #     boundaryRight = 6
+        #     boundaryLeft = -6
+        # if t > 800:
+        #     boundaryBottom = -8
 
-        vel[(pos[:, 0] > boundaryRight), 0] *= boundDamping
-        pos[(pos[:, 0] > boundaryRight), 0] = boundaryRight
+        boundDamping = -0.5
+        boundFix = 0.1
 
-        vel[(pos[:, 0] < boundaryLeft), 0] *= boundDamping
-        pos[(pos[:, 0] < boundaryLeft), 0] = boundaryLeft
+        # Check if particles collide with the boundaries
+        out_of_bounds_left = pos[:, 0] <= boundaryLeft
+        out_of_bounds_right = pos[:, 0] >= boundaryRight
+        out_of_bounds_top = pos[:, 1] >= boundaryTop
+        out_of_bounds_bottom = pos[:, 1] <= boundaryBottom
 
-        vel[(pos[:, 1] > boundaryTop), 1] *= boundDamping
-        pos[(pos[:, 1] > boundaryTop), 1] = boundaryTop
+        # Reflect velocities
+        vel[out_of_bounds_left, 0] *= boundDamping
+        vel[out_of_bounds_right, 0] *= boundDamping
+        vel[out_of_bounds_top, 1] *= boundDamping
+        vel[out_of_bounds_bottom, 1] *= boundDamping
 
-        vel[(pos[:, 1] < boundaryBottom), 1] *= boundDamping
-        pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
+        # Add small vel to prevent particles of getting stuck in the border
+        vel[out_of_bounds_left, 0] += boundFix
+        vel[out_of_bounds_right, 0] -= boundFix
+        vel[out_of_bounds_top, 1] -= boundFix
+        vel[out_of_bounds_bottom, 1] += boundFix
+
+        # Update positions
+        pos[out_of_bounds_left, 0] = boundaryLeft
+        pos[out_of_bounds_right, 0] = boundaryRight
+        pos[out_of_bounds_top, 1] = boundaryTop
+        pos[out_of_bounds_bottom, 1] = boundaryBottom
 
         # update accelerations
-        acc = getAcceleration(N, mass, pos, vel, densityReference, h, nu)
+        acc, pressure = getAcceleration(N, mass, pos, vel, densityReference, h, nu)
 
         # (1/2) kick
         vel += acc * dt / 2
 
-        # update window
-        plt.sca(ax)
-        plt.cla()
-        plt.scatter(
-            pos[:, 0],
-            pos[:, 1],
-            s=20,
-            alpha=0.5,
-            c=colors,
-        )
-        ax.set(xlim=(-20, 20), ylim=(-6, 20))
-        plt.pause(0.0001)
+        if simulateInRealtime:
+            # update window
+            plt.sca(ax)
+            plt.cla()
+            plt.scatter(
+                pos[:, 0],
+                pos[:, 1],
+                s=40,
+                alpha=0.5,
+                c=pressure,
+            )
+            ax.set(xlim=(-50, 50), ylim=(-10, 50))
+            plt.pause(0.0001)
+        else:
+            positions.append(pos.copy())
+
+            if oldT < np.round((t / maxT) * 100):
+                oldT = np.round((t / maxT) * 100)
+                print(oldT)
+
+    if simulateInRealtime == False:
+        positions = np.array(positions)
+        np.save("positions.npy", positions)
 
     return 0
 
