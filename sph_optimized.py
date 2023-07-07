@@ -34,9 +34,9 @@ def getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance):
     y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
     pos[:, 0] = x * distance - xPos
-    pos[:, 1] = y * distance + 10
+    pos[:, 1] = y * distance + 2
 
-    colors = np.full(N, "yellow")
+    colors = np.full(N, "black")
 
     # for i in range(N):
     #     if pos[i, 0] < 0:
@@ -91,10 +91,8 @@ def getDensity(mass, N, pos, h):
 def getPressure(density, densityReference):
     # speed of sound
     c = 5  # m/s
-    # Adiabatenexponent
-    m = 7
+    m = 7  # Adiabatenexponent
     pressureReference = 0
-
     B = (densityReference * c**2) / m
 
     pressure = B * (((density / densityReference) ** m) - 1) + pressureReference
@@ -142,10 +140,12 @@ def main():
     if simulateInRealtime == False:
         positions = []
         oldT = 0
+        oldTime = time.time()
+        allDTs = []
 
     # size of particle cube
     nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 200  # number of particles in y direction
+    nParticlesY = 20  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.5  # m
@@ -172,10 +172,8 @@ def main():
     # show window
     fig, ax = plt.subplots()
 
-    maxT = 1000
+    maxT = 200
     dt = 0.06
-
-    oldTime = time.time()
 
     if simulateInRealtime:
         plt.show(block=False)
@@ -189,8 +187,8 @@ def main():
         pos += vel * dt
 
         # collisions
-        boundaryLeft = -30
-        boundaryRight = 30
+        boundaryLeft = -8
+        boundaryRight = 8
         boundaryTop = 1000
         boundaryBottom = 0
 
@@ -239,23 +237,27 @@ def main():
                 c=colors,
             )
             ax.set(xlim=(-60, 60), ylim=(-10, 110))
-            plt.pause(0.0001)
+            plt.pause(0.001)
         else:
             positions.append(pos.copy())
 
+            # print rendering progress
             if oldT < np.round((t / maxT) * 100):
                 oldT = np.round((t / maxT) * 100)
                 realDT = time.time() - oldTime
                 oldTime = time.time()
+                allDTs.append(realDT)
 
                 print(
                     oldT,
                     "%, remaining:",
                     np.round((realDT * (100 - oldT)) / 60, 3),
-                    "min",
+                    "min; average dt:",
+                    sum(allDTs) / len(allDTs),
                 )
 
     if simulateInRealtime == False:
+        # save positions
         positions = np.array(positions)
         np.save("saved_positions/positions.npy", positions)
 
