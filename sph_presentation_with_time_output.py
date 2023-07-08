@@ -87,8 +87,8 @@ def main():
     # * Simulation parameters
 
     # size of particle cube
-    nParticlesX = 5  # number of particles in x direction
-    nParticlesY = 5  # number of particles in y direction
+    nParticlesX = 10  # number of particles in x direction
+    nParticlesY = 10  # number of particles in y direction
 
     # number of particles
     N = nParticlesX * nParticlesY
@@ -116,17 +116,15 @@ def main():
     # initial velocity of particles
     vel = np.zeros((N, 2))  # m/s
     # initial acceleration of particles
-    acc = getAcceleration(
-        N, mass, pos, vel, densityReference, pressureReference, h, nu, g
-    )  # m/s**2
+    acc = np.zeros((N, 2))  # m/s**2
 
     # show window
     fig, ax = plt.subplots()
 
-    maxT = 200
+    maxT = 100
     dt = 0.06
 
-    plt.show(block=False)
+    # plt.show(block=False)
 
     oldT = 0
     oldTime = time.time()
@@ -141,25 +139,30 @@ def main():
         pos += vel * dt
 
         # boundaries
-        boundaryLeft = -8
-        boundaryRight = 8
+        boundaryLeft = -4
+        boundaryRight = 4
         boundaryTop = 1000
         boundaryBottom = 0
 
-        boundDamping = -0.5
+        boundaryDamping = -0.5
 
-        # right boundary
-        vel[(pos[:, 0] > boundaryRight), 0] *= boundDamping
-        pos[(pos[:, 0] > boundaryRight), 0] = boundaryRight
-        # left boundary
-        vel[(pos[:, 0] < boundaryLeft), 0] *= boundDamping
-        pos[(pos[:, 0] < boundaryLeft), 0] = boundaryLeft
-        # top boundary
-        vel[(pos[:, 1] > boundaryTop), 1] *= boundDamping
-        pos[(pos[:, 1] > boundaryTop), 1] = boundaryTop
-        # bottom boundary
-        vel[(pos[:, 1] < boundaryBottom), 1] *= boundDamping
-        pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
+        for i in range(N):
+            # right boundary
+            if pos[i][0] > boundaryRight:
+                vel[i][0] *= boundaryDamping
+                pos[i][0] = boundaryRight
+            # left boundary
+            elif pos[i][0] < boundaryLeft:
+                vel[i][0] *= boundaryDamping
+                pos[i][0] = boundaryLeft
+            # top boundary
+            if pos[i][1] > boundaryTop:
+                vel[i][1] *= boundaryDamping
+                pos[i][1] = boundaryTop
+            # bottom boundary
+            elif pos[i][1] < boundaryBottom:
+                vel[i][1] *= boundaryDamping
+                pos[i][1] = boundaryBottom
 
         # update accelerations
         acc = getAcceleration(
@@ -170,31 +173,32 @@ def main():
         vel += acc * dt / 2
 
         # update window
-        plt.sca(ax)
-        plt.cla()
-        plt.scatter(
-            pos[:, 0],
-            pos[:, 1],
-            s=40,
-            alpha=0.5,
-        )
-        ax.set(xlim=(-60, 60), ylim=(-10, 110))
-        plt.pause(0.001)
+        # plt.sca(ax)
+        # plt.cla()
+        # plt.scatter(
+        #     pos[:, 0],
+        #     pos[:, 1],
+        #     s=40,
+        #     alpha=0.5,
+        # )
+        # ax.set(xlim=(-4, 4), ylim=(0, 8))
+        # plt.gca().set_aspect("equal")
+        # plt.pause(0.001)
 
-        if oldT < np.round((t / maxT) * 100):
-            oldT = np.round((t / maxT) * 100)
-            realDT = time.time() - oldTime
-            oldTime = time.time()
-            allDTs.append(realDT)
+        # if oldT < np.round((t / maxT) * 100):
+        #     oldT = np.round((t / maxT) * 100)
+        #     realDT = time.time() - oldTime
+        #     oldTime = time.time()
+        #     allDTs.append(realDT)
 
-            print(
-                oldT,
-                "%, remaining:",
-                np.round((realDT * (100 - oldT)) / 60, 3),
-                "min; average dt:",
-                sum(allDTs) / len(allDTs),
-            )
-
+        #     print(
+        #         oldT,
+        #         "%, remaining:",
+        #         np.round((realDT * (100 - oldT)) / 60, 3),
+        #         "min; average dt:",
+        #         sum(allDTs) / len(allDTs),
+        #     )
+    print(time.time() - oldTime)
     return 0
 
 

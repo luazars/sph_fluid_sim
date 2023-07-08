@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -86,8 +87,8 @@ def main():
     # * Simulation parameters
 
     # size of particle cube
-    nParticlesX = 5  # number of particles in x direction
-    nParticlesY = 5  # number of particles in y direction
+    nParticlesX = 10  # number of particles in x direction
+    nParticlesY = 10  # number of particles in y direction
 
     # number of particles
     N = nParticlesX * nParticlesY
@@ -134,26 +135,32 @@ def main():
         # drift
         pos += vel * dt
 
-        # boundaries
-        boundaryLeft = -8
-        boundaryRight = 8
+        # boundary positions
+        boundaryLeft = -4
+        boundaryRight = 4
         boundaryTop = 1000
         boundaryBottom = 0
 
-        boundDamping = -0.5
+        boundaryDamping = -0.5
 
-        # right boundary
-        vel[(pos[:, 0] > boundaryRight), 0] *= boundDamping
-        pos[(pos[:, 0] > boundaryRight), 0] = boundaryRight
-        # left boundary
-        vel[(pos[:, 0] < boundaryLeft), 0] *= boundDamping
-        pos[(pos[:, 0] < boundaryLeft), 0] = boundaryLeft
-        # top boundary
-        vel[(pos[:, 1] > boundaryTop), 1] *= boundDamping
-        pos[(pos[:, 1] > boundaryTop), 1] = boundaryTop
-        # bottom boundary
-        vel[(pos[:, 1] < boundaryBottom), 1] *= boundDamping
-        pos[(pos[:, 1] < boundaryBottom), 1] = boundaryBottom
+        for i in range(N):
+            # right boundary
+            if pos[i][0] > boundaryRight:
+                vel[i][0] *= boundaryDamping
+                pos[i][0] = boundaryRight
+            # left boundary
+            if pos[i][0] < boundaryLeft:
+                vel[i][0] *= boundaryDamping
+                pos[i][0] = boundaryLeft
+
+            # top boundary
+            if pos[i][1] > boundaryTop:
+                vel[i][1] *= boundaryDamping
+                pos[i][1] = boundaryTop
+            # bottom boundary
+            if pos[i][1] < boundaryBottom:
+                vel[i][1] *= boundaryDamping
+                pos[i][1] = boundaryBottom
 
         # update accelerations
         acc = getAcceleration(
@@ -172,7 +179,8 @@ def main():
             s=40,
             alpha=0.5,
         )
-        ax.set(xlim=(-60, 60), ylim=(-10, 110))
+        ax.set(xlim=(-4, 4), ylim=(-0, 8))
+        plt.gca().set_aspect("equal")
         plt.pause(0.001)
 
     return 0
