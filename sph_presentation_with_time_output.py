@@ -116,16 +116,19 @@ def main():
     # initial velocity of particles
     vel = np.zeros((N, 2))  # m/s
     # initial acceleration of particles
-    acc = getAcceleration(
-        N, mass, pos, vel, densityReference, pressureReference, h, nu, g
-    )  # m/s**2
-
-    maxT = 200
-    dt = 0.06
+    acc = np.zeros((N, 2))  # m/s**2
 
     # show window
     fig, ax = plt.subplots()
-    plt.show(block=False)
+
+    maxT = 100
+    dt = 0.06
+
+    # plt.show(block=False)
+
+    oldT = 0
+    oldTime = time.time()
+    allDTs = []
 
     # * main loop
     for t in range(maxT):
@@ -135,7 +138,7 @@ def main():
         # drift
         pos += vel * dt
 
-        # boundary positions
+        # boundaries
         boundaryLeft = -4
         boundaryRight = 4
         boundaryTop = 1000
@@ -149,16 +152,15 @@ def main():
                 vel[i][0] *= boundaryDamping
                 pos[i][0] = boundaryRight
             # left boundary
-            if pos[i][0] < boundaryLeft:
+            elif pos[i][0] < boundaryLeft:
                 vel[i][0] *= boundaryDamping
                 pos[i][0] = boundaryLeft
-
             # top boundary
             if pos[i][1] > boundaryTop:
                 vel[i][1] *= boundaryDamping
                 pos[i][1] = boundaryTop
             # bottom boundary
-            if pos[i][1] < boundaryBottom:
+            elif pos[i][1] < boundaryBottom:
                 vel[i][1] *= boundaryDamping
                 pos[i][1] = boundaryBottom
 
@@ -171,18 +173,32 @@ def main():
         vel += acc * dt / 2
 
         # update window
-        plt.sca(ax)
-        plt.cla()
-        plt.scatter(
-            pos[:, 0],
-            pos[:, 1],
-            s=40,
-            alpha=0.5,
-        )
-        ax.set(xlim=(-4, 4), ylim=(-0, 8))
-        plt.gca().set_aspect("equal")
-        plt.pause(0.001)
+        # plt.sca(ax)
+        # plt.cla()
+        # plt.scatter(
+        #     pos[:, 0],
+        #     pos[:, 1],
+        #     s=40,
+        #     alpha=0.5,
+        # )
+        # ax.set(xlim=(-4, 4), ylim=(0, 8))
+        # plt.gca().set_aspect("equal")
+        # plt.pause(0.001)
 
+        # if oldT < np.round((t / maxT) * 100):
+        #     oldT = np.round((t / maxT) * 100)
+        #     realDT = time.time() - oldTime
+        #     oldTime = time.time()
+        #     allDTs.append(realDT)
+
+        #     print(
+        #         oldT,
+        #         "%, remaining:",
+        #         np.round((realDT * (100 - oldT)) / 60, 3),
+        #         "min; average dt:",
+        #         sum(allDTs) / len(allDTs),
+        #     )
+    print(time.time() - oldTime)
     return 0
 
 

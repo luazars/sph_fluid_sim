@@ -36,7 +36,7 @@ def getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance):
     pos[:, 0] = x * distance - xPos
     pos[:, 1] = y * distance + 10
 
-    colors = np.full(N, "yellow")
+    colors = np.full(N, "black")
 
     # for i in range(N):
     #     if pos[i, 0] < 0:
@@ -88,27 +88,22 @@ def getDensity(mass, N, pos, h):
 
 # calculate pressure with density of all particles with tait equation
 # https://de.wikipedia.org/wiki/Taitsche_Gleichung
-def getPressure(density, densityReference):
-    # speed of sound
-    c = 5  # m/s
-    # Adiabatenexponent
-    m = 7
-    pressureReference = 0
-
+def getPressure(density, densityReference, pressureReference):
+    c = 5  # speed of sound
+    m = 7  # Adiabatenexponent
     B = (densityReference * c**2) / m
 
     pressure = B * (((density / densityReference) ** m) - 1) + pressureReference
     pressure = np.maximum(pressure, 0)
+
     return pressure  # Pa
 
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, vel, densityReference, h, nu):
+def getAcceleration(N, mass, pos, vel, densityReference, pressureReference, h, nu, g):
     density = getDensity(mass, N, pos, h)
-    pressure = getPressure(density, densityReference)
-
-    gravity = (0, -2)
+    pressure = getPressure(density, densityReference, pressureReference)
 
     dx, dy = getPairwiseSeparations(pos, pos)
 
@@ -126,7 +121,7 @@ def getAcceleration(N, mass, pos, vel, densityReference, h, nu):
     acc = np.hstack((ax, ay))
 
     # gravity
-    acc += gravity
+    acc += g
 
     # viscosity
     acc -= nu * vel
@@ -136,12 +131,7 @@ def getAcceleration(N, mass, pos, vel, densityReference, h, nu):
 
 def main():
     # Simulation parameters
-
     simulateInRealtime = False
-
-    if simulateInRealtime == False:
-        positions = []
-        oldT = 0
 
     # size of particle cube
     nParticlesX = 20  # number of particles in x direction
@@ -150,34 +140,41 @@ def main():
     # distance between Particles at start
     distance = 0.5  # m
 
-    # kernel radius
-    h = np.sqrt(2) * distance  # m
-    # number of particles
-    N = nParticlesX * nParticlesY
-
     densityReference = 700  # kg/m^2
+    pressureReference = 0
 
+    #  weight force
+    g = (0, -2)
+
+    # viscosity
     nu = 0.2
 
+    maxT = 400
+    dt = 0.06
+
+    # number of particles
+    N = nParticlesX * nParticlesY
+    # kernel radius
+    h = np.sqrt(2) * distance  # m
     # mass particle
     mass = densityReference * distance**2  # kg
 
     # initial positions of particles
     pos, colors = getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance)  # m
-    # initial acceleration of particles
-    acc = np.zeros((N, 2))  # m/s**2
     # initial velocity of particles
     vel = np.zeros((N, 2))  # m/s
+    # initial acceleration of particles
+    acc = np.zeros((N, 2))  # m/s**2
 
     # show window
     fig, ax = plt.subplots()
 
-    maxT = 1000
-    dt = 0.06
-
-    oldTime = time.time()
-
-    if simulateInRealtime:
+    if simulateInRealtime == False:
+        positions = []
+        oldT = 0
+        oldTime = time.time()
+        allDTs = []
+    else:
         plt.show(block=False)
 
     # main loop
@@ -189,13 +186,13 @@ def main():
         pos += vel * dt
 
         # collisions
-        boundaryLeft = -30
-        boundaryRight = 30
+        boundaryLeft = -40
+        boundaryRight = 40
         boundaryTop = 1000
         boundaryBottom = 0
 
-        boundDamping = -0.4
-        boundFix = 0.1
+        boundDamping = -0.5
+        boundFix = 0.5
 
         # Check if particles collide with the boundaries
         out_of_bounds_left = pos[:, 0] <= boundaryLeft
@@ -222,7 +219,9 @@ def main():
         pos[out_of_bounds_bottom, 1] = boundaryBottom
 
         # update accelerations
-        acc = getAcceleration(N, mass, pos, vel, densityReference, h, nu)
+        acc = getAcceleration(
+            N, mass, pos, vel, densityReference, pressureReference, h, nu, g
+        )
 
         # (1/2) kick
         vel += acc * dt / 2
@@ -238,24 +237,29 @@ def main():
                 alpha=0.5,
                 c=colors,
             )
-            ax.set(xlim=(-60, 60), ylim=(-10, 110))
-            plt.pause(0.0001)
+            ax.set(xlim=(-40, 40), ylim=(0, 80))
+            plt.gca().set_aspect("equal")
+            plt.pause(0.001)
         else:
             positions.append(pos.copy())
 
+            # print rendering progress
             if oldT < np.round((t / maxT) * 100):
                 oldT = np.round((t / maxT) * 100)
                 realDT = time.time() - oldTime
                 oldTime = time.time()
+                allDTs.append(realDT)
 
                 print(
                     oldT,
                     "%, remaining:",
                     np.round((realDT * (100 - oldT)) / 60, 3),
-                    "min",
+                    "min; average dt:",
+                    sum(allDTs) / len(allDTs),
                 )
 
     if simulateInRealtime == False:
+        # save positions
         positions = np.array(positions)
         np.save("saved_positions/positions.npy", positions)
 
