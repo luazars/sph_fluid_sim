@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -119,12 +120,17 @@ def main():
         N, mass, pos, vel, densityReference, pressureReference, h, nu, g
     )  # m/s**2
 
+    # show window
+    fig, ax = plt.subplots()
+
     maxT = 200
     dt = 0.06
 
-    # show window
-    fig, ax = plt.subplots()
     plt.show(block=False)
+
+    oldT = 0
+    oldTime = time.time()
+    allDTs = []
 
     # * main loop
     for t in range(maxT):
@@ -174,6 +180,20 @@ def main():
         )
         ax.set(xlim=(-60, 60), ylim=(-10, 110))
         plt.pause(0.001)
+
+        if oldT < np.round((t / maxT) * 100):
+            oldT = np.round((t / maxT) * 100)
+            realDT = time.time() - oldTime
+            oldTime = time.time()
+            allDTs.append(realDT)
+
+            print(
+                oldT,
+                "%, remaining:",
+                np.round((realDT * (100 - oldT)) / 60, 3),
+                "min; average dt:",
+                sum(allDTs) / len(allDTs),
+            )
 
     return 0
 

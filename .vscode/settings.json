@@ -2,7 +2,9 @@
   "cSpell.words": [
     "linalg",
     "matplotlib",
-    "tait"
+    "tait",
+    "xlim",
+    "ylim"
   ],
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter"
