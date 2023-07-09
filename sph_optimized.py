@@ -1,3 +1,4 @@
+import matplotlib.animation as animation
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,7 +34,7 @@ def getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance):
     x = np.tile(np.arange(nParticlesX), nParticlesY)
     y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
-    pos[:, 0] = x * distance - xPos
+    pos[:, 0] = x * distance - xPos - 35
     pos[:, 1] = y * distance + 10
 
     colors = np.full(N, "black")
@@ -134,8 +135,8 @@ def main():
     simulateInRealtime = False
 
     # size of particle cube
-    nParticlesX = 20  # number of particles in x direction
-    nParticlesY = 200  # number of particles in y direction
+    nParticlesX = 80  # number of particles in x direction
+    nParticlesY = 80  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.5  # m
@@ -144,13 +145,13 @@ def main():
     pressureReference = 0
 
     #  weight force
-    g = (0, -2)
+    g = (0, -1)
 
     # viscosity
-    nu = 0.2
+    nu = 0.1
 
-    maxT = 400
-    dt = 0.06
+    maxT = 800
+    dt = 0.05
 
     # number of particles
     N = nParticlesX * nParticlesY
@@ -167,7 +168,7 @@ def main():
     acc = np.zeros((N, 2))  # m/s**2
 
     # show window
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots(facecolor="#000000")
 
     if simulateInRealtime == False:
         positions = []
@@ -175,6 +176,9 @@ def main():
         oldTime = time.time()
         allDTs = []
     else:
+        ax.set_facecolor("#131621")
+        ax.spines["bottom"].set_color("black")
+        ax.spines["left"].set_color("black")
         plt.show(block=False)
 
     # main loop
@@ -186,36 +190,36 @@ def main():
         pos += vel * dt
 
         # collisions
-        boundaryLeft = -40
-        boundaryRight = 40
+        boundaryLeft = -30
+        boundaryRight = 30
         boundaryTop = 1000
         boundaryBottom = 0
 
         boundDamping = -0.5
-        boundFix = 0.5
+        boundFix = 0.1
 
         # Check if particles collide with the boundaries
         out_of_bounds_left = pos[:, 0] <= boundaryLeft
         out_of_bounds_right = pos[:, 0] >= boundaryRight
-        out_of_bounds_top = pos[:, 1] >= boundaryTop
+        # out_of_bounds_top = pos[:, 1] >= boundaryTop
         out_of_bounds_bottom = pos[:, 1] <= boundaryBottom
 
         # Reflect velocities
         vel[out_of_bounds_left, 0] *= boundDamping
         vel[out_of_bounds_right, 0] *= boundDamping
-        vel[out_of_bounds_top, 1] *= boundDamping
+        # vel[out_of_bounds_top, 1] *= boundDamping
         vel[out_of_bounds_bottom, 1] *= boundDamping
 
         # Add small vel to prevent particles of getting stuck in the border
         vel[out_of_bounds_left, 0] += boundFix
         vel[out_of_bounds_right, 0] -= boundFix
-        vel[out_of_bounds_top, 1] -= boundFix
+        # vel[out_of_bounds_top, 1] -= boundFix
         vel[out_of_bounds_bottom, 1] += boundFix
 
         # Update positions
         pos[out_of_bounds_left, 0] = boundaryLeft
         pos[out_of_bounds_right, 0] = boundaryRight
-        pos[out_of_bounds_top, 1] = boundaryTop
+        # pos[out_of_bounds_top, 1] = boundaryTop
         pos[out_of_bounds_bottom, 1] = boundaryBottom
 
         # update accelerations
@@ -233,11 +237,15 @@ def main():
             plt.scatter(
                 pos[:, 0],
                 pos[:, 1],
-                s=40,
-                alpha=0.5,
-                c=colors,
+                s=2,
+                alpha=1,
+                c="blue",
             )
-            ax.set(xlim=(-40, 40), ylim=(0, 80))
+
+            ax.set(
+                xlim=(-50, 50),
+                ylim=(0, 100),
+            )
             plt.gca().set_aspect("equal")
             plt.pause(0.001)
         else:
@@ -261,7 +269,7 @@ def main():
     if simulateInRealtime == False:
         # save positions
         positions = np.array(positions)
-        np.save("saved_positions/positions.npy", positions)
+        np.save("saved_positions/positions_onborder_80x80.npy", positions)
 
     return 0
 
