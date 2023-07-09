@@ -34,8 +34,8 @@ def getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance):
     x = np.tile(np.arange(nParticlesX), nParticlesY)
     y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
-    pos[:, 0] = x * distance - xPos - 33
-    pos[:, 1] = y * distance + 10
+    pos[:, 0] = x * distance - xPos
+    pos[:, 1] = y * distance + 2
 
     colors = np.full(N, "black")
 
@@ -102,7 +102,9 @@ def getPressure(density, densityReference, pressureReference):
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAcceleration(N, mass, pos, vel, densityReference, pressureReference, h, nu, g):
+def getAccelerationAndPressure(
+    N, mass, pos, vel, densityReference, pressureReference, h, nu, g
+):
     density = getDensity(mass, N, pos, h)
     pressure = getPressure(density, densityReference, pressureReference)
 
@@ -127,7 +129,7 @@ def getAcceleration(N, mass, pos, vel, densityReference, pressureReference, h, n
     # viscosity
     acc -= nu * vel
 
-    return acc
+    return acc, pressure
 
 
 def main():
@@ -135,8 +137,8 @@ def main():
     simulateInRealtime = False
 
     # size of particle cube
-    nParticlesX = 70  # number of particles in x direction
-    nParticlesY = 70  # number of particles in y direction
+    nParticlesX = 6  # number of particles in x direction
+    nParticlesY = 300  # number of particles in y direction
 
     # distance between Particles at start
     distance = 0.5  # m
@@ -148,9 +150,9 @@ def main():
     g = (0, -1)
 
     # viscosity
-    nu = 0.1
+    nu = 0.4
 
-    maxT = 800
+    maxT = 1300
     dt = 0.05
 
     # number of particles
@@ -164,6 +166,8 @@ def main():
     pos, colors = getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance)  # m
     # initial velocity of particles
     vel = np.zeros((N, 2))  # m/s
+    # initial velocity of particles
+    pressure = np.zeros((N, 2))  # m/s
     # initial acceleration of particles
     acc = np.zeros((N, 2))  # m/s**2
 
@@ -172,6 +176,7 @@ def main():
 
     if simulateInRealtime == False:
         positions = []
+        pressures = []
         oldT = 0
         oldTime = time.time()
         allDTs = []
@@ -190,8 +195,8 @@ def main():
         pos += vel * dt
 
         # collisions
-        boundaryLeft = -50
-        boundaryRight = 50
+        boundaryLeft = -5
+        boundaryRight = 5
         boundaryTop = 1000
         boundaryBottom = 0
 
@@ -223,7 +228,7 @@ def main():
         pos[out_of_bounds_bottom, 1] = boundaryBottom
 
         # update accelerations
-        acc = getAcceleration(
+        acc, pressure = getAccelerationAndPressure(
             N, mass, pos, vel, densityReference, pressureReference, h, nu, g
         )
 
@@ -239,17 +244,18 @@ def main():
                 pos[:, 1],
                 s=2,
                 alpha=1,
-                c="blue",
+                c=pressure,
             )
 
             ax.set(
-                xlim=(-50, 50),
-                ylim=(0, 100),
+                xlim=(-5, 5),
+                ylim=(0, 60),
             )
             plt.gca().set_aspect("equal")
             plt.pause(0.001)
         else:
             positions.append(pos.copy())
+            pressures.append(pressure.copy())
 
             # print rendering progress
             if oldT < np.round((t / maxT) * 100):
@@ -269,7 +275,9 @@ def main():
     if simulateInRealtime == False:
         # save positions
         positions = np.array(positions)
-        np.save("saved_positions/positions_onborder_80x80.npy", positions)
+        pressures = np.array(pressures)
+        np.save("saved_positions/positions_high.npy", positions)
+        np.save("saved_pressures/pressures_high.npy", pressures)
 
     return 0
 

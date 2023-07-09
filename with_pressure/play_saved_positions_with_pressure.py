@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 
 def main():
     positions = np.load("saved_positions/positions.npy")
+    pressures = np.load("saved_pressures/pressures.npy")
 
     num_frames = positions.shape[0]
+
     _, ax = plt.subplots(facecolor="black")
     ax.set_facecolor("#131621")
     ax.spines["bottom"].set_color("black")
@@ -20,7 +22,7 @@ def main():
             positions[frame, :, 1],
             s=1,
             alpha=1,
-            color="#eb4034",
+            c=pressures[frame],
         )
         plt.pause(0.01)
 

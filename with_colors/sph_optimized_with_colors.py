@@ -34,27 +34,27 @@ def getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance):
     x = np.tile(np.arange(nParticlesX), nParticlesY)
     y = np.repeat(np.arange(nParticlesY), nParticlesX)
 
-    pos[:, 0] = x * distance - xPos - 35
-    pos[:, 1] = y * distance + 10
+    pos[:, 0] = x * distance - xPos
+    pos[:, 1] = y * distance + 2
 
-    colors = np.full(N, "black")
+    colors = np.full(N, "#4287f5")
 
-    # for i in range(N):
-    #     if pos[i, 0] < 0:
-    #         pos[i, 0] -= 3
-    #         if pos[i, 1] > 10:
-    #             pos[i, 1] += 10
-    #             colors[i] = "red"
-    #         else:
-    #             colors[i] = "blue"
+    for i in range(N):
+        if pos[i, 0] < 0:
+            pos[i, 0] -= 2
+            if pos[i, 1] > 15:
+                pos[i, 1] += 10
+                colors[i] = "#32a852"
+            else:
+                colors[i] = "#4287f5"
 
-    #     else:
-    #         pos[i, 0] += 3
-    #         if pos[i, 1] > 10:
-    #             pos[i, 1] += 10
-    #             colors[i] = "yellow"
-    #         else:
-    #             colors[i] = "green"
+        else:
+            pos[i, 0] += 2
+            if pos[i, 1] > 25:
+                pos[i, 1] += 10
+                colors[i] = "#fcba03"
+            else:
+                colors[i] = "#d94ccb"
 
     return pos, colors
 
@@ -102,9 +102,7 @@ def getPressure(density, densityReference, pressureReference):
 
 # calculate acceleration of all particles
 # https://philip-mocz.medium.com/create-your-own-smoothed-particle-hydrodynamics-simulation-with-python-76e1cec505f1
-def getAccelerationAndPressure(
-    N, mass, pos, vel, densityReference, pressureReference, h, nu, g
-):
+def getAcceleration(N, mass, pos, vel, densityReference, pressureReference, h, nu, g):
     density = getDensity(mass, N, pos, h)
     pressure = getPressure(density, densityReference, pressureReference)
 
@@ -129,7 +127,7 @@ def getAccelerationAndPressure(
     # viscosity
     acc -= nu * vel
 
-    return acc, pressure
+    return acc
 
 
 def main():
@@ -137,7 +135,7 @@ def main():
     simulateInRealtime = False
 
     # size of particle cube
-    nParticlesX = 80  # number of particles in x direction
+    nParticlesX = 50  # number of particles in x direction
     nParticlesY = 80  # number of particles in y direction
 
     # distance between Particles at start
@@ -150,9 +148,9 @@ def main():
     g = (0, -1)
 
     # viscosity
-    nu = 0.1
+    nu = 0.3
 
-    maxT = 800
+    maxT = 1100
     dt = 0.05
 
     # number of particles
@@ -166,8 +164,6 @@ def main():
     pos, colors = getPositionAndColorInGrid(N, nParticlesX, nParticlesY, distance)  # m
     # initial velocity of particles
     vel = np.zeros((N, 2))  # m/s
-    # initial velocity of particles
-    pressure = np.zeros((N, 2))  # m/s
     # initial acceleration of particles
     acc = np.zeros((N, 2))  # m/s**2
 
@@ -227,7 +223,7 @@ def main():
         pos[out_of_bounds_bottom, 1] = boundaryBottom
 
         # update accelerations
-        acc = getAccelerationAndPressure(
+        acc = getAcceleration(
             N, mass, pos, vel, densityReference, pressureReference, h, nu, g
         )
 
@@ -238,17 +234,11 @@ def main():
             # update window
             plt.sca(ax)
             plt.cla()
-            plt.scatter(
-                pos[:, 0],
-                pos[:, 1],
-                s=2,
-                alpha=1,
-                c="blue",
-            )
+            plt.scatter(pos[:, 0], pos[:, 1], s=2, alpha=1, c=colors)
 
             ax.set(
-                xlim=(-50, 50),
-                ylim=(0, 100),
+                xlim=(-30, 30),
+                ylim=(0, 60),
             )
             plt.gca().set_aspect("equal")
             plt.pause(0.001)
@@ -273,7 +263,8 @@ def main():
     if simulateInRealtime == False:
         # save positions
         positions = np.array(positions)
-        np.save("saved_positions/positions_onborder_80x80.npy", positions)
+        np.save("saved_positions/positions_colorfull.npy", positions)
+        np.save("saved_colors/colors.npy", colors)
 
     return 0
 
